@@ -1,0 +1,33 @@
+image: python:3.10
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+cache:
+  paths:
+    - .cache/pip
+    - .cache/pytest
+
+before_script:
+  - python -m pip install --upgrade pip
+
+stages:
+  - test
+
+pep8:
+  stage: test
+  script:
+    - pip install flake8
+    - flake8 .
+
+pylint:
+  stage: test
+  script:
+    - pip install pylint
+    - pylint your_module_name
+
+black:
+  stage: test
+  script:
+    - pip install black
+    - black --check .
