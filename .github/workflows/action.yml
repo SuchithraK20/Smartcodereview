@@ -1,0 +1,51 @@
+name: 'Code Review using Ollama'
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+description: 'Perform a code review on code modified using Ollama'
+
+jobs:
+  code-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Install Ollama
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          ollama serve &
+          for i in {1..30}; do
+            if curl -s http://localhost:11434 > /dev/null; then
+              echo "Ollama server is ready."
+              break
+            fi
+            echo "Waiting for Ollama server to start..."
+            sleep 2
+          done
+          ollama pull codellama || { echo "Failed to pull codellama model"; exit 1; }
+
+      - name: Get modified files
+        id: get-modified-files
+        uses: tj-actions/changed-files@v43
+
+      - name: Review modified files
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "" > ollama_review.txt
+          for file in ${{ steps.get-modified-files.outputs.all_changed_files }}; do
+            modified_file_review=$(curl -s http://127.0.0.1:11434/api/generate -d "{\"model\": \"codellama\", \"prompt\": \"Review the following file:\\n\\n\`\`\`\\n$(cat $file)\\n\`\`\`\", \"stream\": false}" | jq -r '.response')
+            file_comment="Ollama Code Review for \`$file\`:\n\n$modified_file_review"
+            echo "$file_comment" >> ollama_review.txt
+          done
+
+          gh pr comment ${{ github.event.pull_request.number }} --body "$(cat ollama_review.txt)"
+        shell: bash
