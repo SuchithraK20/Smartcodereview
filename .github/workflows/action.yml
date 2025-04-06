@@ -1,12 +1,21 @@
 name: 'Code Review using Ollama'
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  
 description: 'Perform a code review on code modified using Ollama'
 inputs:
   llm-model:
     description: 'Name of the LLM model to use for code review'
     required: true
     default: 'codellama'
-  runs:
-    using: 'composite'
+jobs:
+  code-review:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
