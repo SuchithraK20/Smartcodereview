@@ -100,13 +100,14 @@ If no issues found, return: []
     print(f"Codellama Response: {codellama_response}")
 
     # Parse the response to extract line-specific suggestions
+    suggestions = []
     try:
+        # Attempt to parse the response as JSON
         suggestions = json.loads(codellama_response)
     except json.JSONDecodeError:
         print("Codellama response is not valid JSON. Attempting to parse as plain text.")
-        suggestions = []
 
-        # Extract line-specific suggestions using regex
+        # Extract line-specific suggestions using regex for plain text fallback
         for match in re.finditer(r"\[CHANGED\] Line (\d+): (.+)", codellama_response):
             line_number = int(match.group(1))
             message = match.group(2).strip()
@@ -121,5 +122,9 @@ If no issues found, return: []
             # Only include suggestions for changed lines
             if int(line) in changed_lines:
                 line_suggestions[int(line)] = message
+
+    # If no line-specific suggestions, add general suggestions
+    if not line_suggestions and isinstance(codellama_response, str):
+        line_suggestions["general"] = codellama_response.strip()
 
     return line_suggestions
