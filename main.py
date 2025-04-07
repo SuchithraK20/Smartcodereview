@@ -1,7 +1,7 @@
 import os
 from github import Github
 from github_utils import get_pr_details, post_inline_comment
-from unidiff import PatchSet
+from unidiff import PatchSet, UnidiffParseError
 from ollama import analyze_code_with_codellama
 
 def map_line_to_diff_position(patch, absolute_line):
@@ -16,18 +16,24 @@ def map_line_to_diff_position(patch, absolute_line):
                     return line.diff_line_no
     return None
 
+
+
 def extract_changed_lines(patch):
     """
     Extracts the line numbers of changed lines from the patch.
     """
-    patch_set = PatchSet(patch)
-    changed_lines = []
-    for patched_file in patch_set:
-        for hunk in patched_file:
-            for line in hunk:
-                if line.is_added:  # Only consider added lines
-                    changed_lines.append(line.target_line_no)
-    return changed_lines
+    try:
+        patch_set = PatchSet(patch)
+        changed_lines = []
+        for patched_file in patch_set:
+            for hunk in patched_file:
+                for line in hunk:
+                    if line.is_added:  # Only consider added lines
+                        changed_lines.append(line.target_line_no)
+        return changed_lines
+    except UnidiffParseError as e:
+        print(f"Failed to parse patch: {e}")
+        return []
 
 def main():
     token = os.getenv("GITHUB_TOKEN")
