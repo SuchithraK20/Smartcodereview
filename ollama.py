@@ -1,9 +1,12 @@
 import requests
 import json
 
+import requests
+import json
+
 def call_codellama(prompt: str) -> str:
     """
-    Calls the Codellama model running on a local server and returns the response.
+    Calls the Codellama model running on a local server and returns the concatenated response.
     """
     url = "http://127.0.0.1:11434/api/generate"  # Adjust the endpoint if necessary
     headers = {"Content-Type": "application/json"}
@@ -15,15 +18,21 @@ def call_codellama(prompt: str) -> str:
     }
 
     try:
-        response = requests.post(url, headers=headers, json=payload)
+        response = requests.post(url, headers=headers, json=payload, stream=True)
         response.raise_for_status()  # Raise an error for HTTP status codes 4xx/5xx
 
-        # Debugging: Log the raw response text
-        print(f"Raw response from Codellama: {response.text}")
+        # Process the response as a stream of JSON objects
+        full_response = ""
+        for line in response.iter_lines():
+            if line:  # Skip empty lines
+                try:
+                    json_line = json.loads(line)
+                    full_response += json_line.get("response", "")
+                except json.JSONDecodeError as e:
+                    print(f"Failed to parse line as JSON: {line}")
+                    continue
 
-        # Attempt to parse the response as JSON
-        response_json = response.json()
-        return response_json.get("choices", [{}])[0].get("text", "").strip()
+        return full_response.strip()
     except requests.exceptions.RequestException as e:
         print(f"Error calling Codellama: {e}")
         return "Error: Unable to process the request."
