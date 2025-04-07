@@ -43,7 +43,7 @@ def call_codellama(prompt: str) -> str:
         
 def analyze_code_with_codellama(file_patch: str) -> dict:
     """
-    Sends the code content to Codellama for analysis and returns suggestions mapped to line numbers.
+    Sends the code content to Codellama for analysis and returns suggestions mapped to line numbers or general suggestions.
     """
     # Prepare the prompt for Codellama
     prompt = f"Review the following Python code and suggest improvements:\n\n{file_patch}"
@@ -57,10 +57,15 @@ def analyze_code_with_codellama(file_patch: str) -> dict:
     # Parse the response to extract line-specific suggestions
     suggestions = {}
     try:
+        # Attempt to extract line-specific suggestions
         for match in re.finditer(r"Line (\d+): (.+)", codellama_response):
             line_number = int(match.group(1))
             suggestion = match.group(2).strip()
             suggestions[line_number] = suggestion
+
+        # If no line-specific suggestions are found, add general suggestions
+        if not suggestions:
+            suggestions["general"] = codellama_response.strip()
     except Exception as e:
         print(f"Failed to parse suggestions: {e}")
 
