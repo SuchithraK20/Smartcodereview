@@ -41,7 +41,7 @@ def call_codellama(prompt: str) -> str:
         print(f"Unexpected response structure: {e}")
         return "Error: Unexpected response structure."
         
-def analyze_code_with_codellama(file_patch: str) -> dict:
+def analyze_code_with_codellama(file_patch: str, filename: str, changed_lines: list) -> dict:
     """
     Sends the code content to Codellama for analysis and returns suggestions mapped to line numbers or general suggestions.
     """
