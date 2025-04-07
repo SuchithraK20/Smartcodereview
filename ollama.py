@@ -100,7 +100,7 @@ If no issues found, return: []
     print(f"Codellama Response: {codellama_response}")
 
     # Parse the response to extract line-specific suggestions
-     try:
+    try:
         suggestions = json.loads(codellama_response)
     except json.JSONDecodeError:
         print("Codellama response is not valid JSON. Attempting to parse as plain text.")
