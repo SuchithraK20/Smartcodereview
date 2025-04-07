@@ -16,14 +16,23 @@ def main():
     files = pr.get_files()
     for file in files:
         if file.filename.endswith(".py"):
+            print(f"Analyzing file: {file.filename}")  # Debugging
             suggestions = analyze_code_with_codellama(file.patch)
+            
+            # Debugging: Log suggestions
+            print(f"Suggestions for {file.filename}: {suggestions}")
+            
             for line, suggestion in suggestions.items():
-                pr.create_review_comment(
-                    body=suggestion,
-                    commit_id=pr.head.sha,
-                    path=file.filename,
-                    position=line,
-                )
+                try:
+                    print(f"Posting comment to {file.filename} at line {line}: {suggestion}")  # Debugging
+                    pr.create_review_comment(
+                        body=suggestion,
+                        commit_id=pr.head.sha,
+                        path=file.filename,
+                        position=line,  # Ensure this is the correct diff position
+                    )
+                except Exception as e:
+                    print(f"Failed to post comment: {e}")  # Debugging
 
 if __name__ == "__main__":
     main()
