@@ -5,7 +5,7 @@ def call_codellama(prompt: str) -> str:
     """
     Calls the Codellama model running on a local server and returns the response.
     """
-    url = "http://127.0.0.1:11434/api/v1/completions"  # Adjust the endpoint if necessary
+    url = "http://127.0.0.1:11434/api/generate"  # Adjust the endpoint if necessary
     headers = {"Content-Type": "application/json"}
     payload = {
         "model": "codellama",  # Specify the model name
