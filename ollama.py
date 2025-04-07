@@ -46,7 +46,52 @@ def analyze_code_with_codellama(file_patch: str) -> dict:
     Sends the code content to Codellama for analysis and returns suggestions mapped to line numbers or general suggestions.
     """
     # Prepare the prompt for Codellama
-    prompt = f"Review the following Python code and provide concise, actionable suggestions. If possible, include the line numbers for specific improvements:\n\n{file_patch}"
+    prompt = f"""
+You are an expert code reviewer. Review the following code changes and provide specific, actionable feedback. Focus on:
+1. Type safety and potential runtime issues
+2. Architecture and design patterns
+3. Code readability and maintainability
+4. Security vulnerabilities (IMPORTANT: for security issues like 'eval', use the EXACT line where the dangerous function is called)
+5. Performance implications
+
+The code below shows:
+- Each line starts with its EXACT line number followed by a colon
+- Changed lines are marked with [CHANGED]
+- You MUST use the EXACT line number shown at the start of the line in your response
+- DO NOT use a line number unless you see it explicitly at the start of a line
+- For security issues, use the line number where the actual dangerous code appears
+- For other multi-line issues, use the first line number where the issue appears
+- Context lines are shown without markers
+
+IMPORTANT NOTES:
+- For security issues (like eval, Function constructor, etc.), always use the line number where the dangerous function is actually called
+- For performance issues (like nested loops), use the line number of the outer function or loop
+- Double-check that your line numbers match exactly with where the issue occurs
+Code to review from {filename}:
+
+{file_patch}
+
+Response format (use EXACT line numbers from the start of lines):
+[
+  {{
+    "line": <number_from_start_of_line>,
+    "type": "type-safety" | "architecture" | "readability" | "security" | "performance" | "suggestion" | "good-practice",
+    "severity": "high" | "medium" | "low",
+    "message": "<specific_issue_and_recommendation>"
+  }}
+]
+
+Rules:
+1. Only comment on [CHANGED] lines
+2. Use EXACT line numbers shown at start of lines
+3. Each line number must match one of: {changed_lines}
+4. Consider context when making suggestions
+5. Be specific and actionable in recommendations
+6. For security issues, use the exact line where dangerous code appears
+7. For other multi-line issues, use the first line number where the issue appears
+
+If no issues found, return: []
+"""
     
     # Call Codellama to analyze the code
     codellama_response = call_codellama(prompt)
