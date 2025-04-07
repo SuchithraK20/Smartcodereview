@@ -46,7 +46,8 @@ def analyze_code_with_codellama(file_patch: str) -> dict:
     Sends the code content to Codellama for analysis and returns suggestions mapped to line numbers or general suggestions.
     """
     # Prepare the prompt for Codellama
-    prompt = f"Review the following Python code and provide concise, actionable suggestions for improvement in a few lines:\n\n{file_patch}"
+    prompt = f"Review the following Python code and provide concise, actionable suggestions. If possible, include the line numbers for specific improvements:\n\n{file_patch}"
+    
     # Call Codellama to analyze the code
     codellama_response = call_codellama(prompt)
 
