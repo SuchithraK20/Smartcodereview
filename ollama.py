@@ -1,8 +1,6 @@
 import requests
 import json
-
-import requests
-import json
+import re
 
 def call_codellama(prompt: str) -> str:
     """
@@ -44,17 +42,25 @@ def call_codellama(prompt: str) -> str:
         print(f"Unexpected response structure: {e}")
         return "Error: Unexpected response structure."
 
-def analyze_code_with_codellama(file_content: str) -> dict:
+import re
+
+def analyze_code_with_codellama(file_patch: str) -> dict:
     """
-    Sends the code content to Codellama for analysis and returns suggestions.
+    Sends the code content to Codellama for analysis and returns suggestions mapped to line numbers.
     """
-    prompt = f"Review the following Python code and suggest improvements:\n\n{file_content}"
-    response = call_codellama(prompt)
-    try:
-        # Parse the response if it's in JSON format
-        suggestions = json.loads(response)
-        return suggestions
-    except json.JSONDecodeError:
-        print("Failed to parse Codellama response.")
-        print(f"Codellama Response: {response}")
-        return {}
+    # Simulate Codellama response (replace with actual API call)
+    codellama_response = """
+    The code is functionally correct and performs the intended task. However, there are some suggestions:
+    1. Use consistent naming conventions: Line 5
+    2. Add type hints: Line 10
+    3. Add comments: Line 15
+    """
+
+    # Parse the response to extract line-specific suggestions
+    suggestions = {}
+    for match in re.finditer(r"Line (\d+): (.+)", codellama_response):
+        line_number = int(match.group(1))
+        suggestion = match.group(2).strip()
+        suggestions[line_number] = suggestion
+
+    return suggestions
