@@ -65,7 +65,7 @@ def main():
                     # Post a general comment on the PR
                     pr.create_issue_comment(f"General suggestions for {file.filename}:\n\n{suggestion}")
                 else:
-                    position = map_line_to_diff_position(file.patch, line)
+                    position = map_line_to_diff_position(file.patch, int(line))
                     if position is None:
                         print(f"Could not map line {line} to a diff position.")
                         continue
