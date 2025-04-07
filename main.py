@@ -1,5 +1,5 @@
 import os
-from github import Github
+from github_utils import get_pr_details
 from ollama import analyze_code_with_codellama
 
 def main():
