@@ -2,6 +2,7 @@ import os
 from github import Github
 from github_utils import get_pr_details, post_inline_comment
 from unidiff import PatchSet
+from ollama import analyze_code_with_codellama
 
 def map_line_to_diff_position(patch, absolute_line):
     """
