@@ -16,6 +16,19 @@ def map_line_to_diff_position(patch, absolute_line):
                     return line.diff_line_no
     return None
 
+def extract_changed_lines(patch):
+    """
+    Extracts the line numbers of changed lines from the patch.
+    """
+    patch_set = PatchSet(patch)
+    changed_lines = []
+    for patched_file in patch_set:
+        for hunk in patched_file:
+            for line in hunk:
+                if line.is_added:  # Only consider added lines
+                    changed_lines.append(line.target_line_no)
+    return changed_lines
+
 def main():
     token = os.getenv("GITHUB_TOKEN")
     repo_name = os.getenv("GITHUB_REPOSITORY")
@@ -30,7 +43,12 @@ def main():
     for file in files:
         if file.filename.endswith(".py"):
             print(f"Analyzing file: {file.filename}")
-            suggestions = analyze_code_with_codellama(file.patch)
+
+            # Extract changed lines
+            changed_lines = extract_changed_lines(file.patch)
+
+            # Call the updated analyze_code_with_codellama function
+            suggestions = analyze_code_with_codellama(file.patch, file.filename, changed_lines)
 
             # Debugging: Log suggestions
             print(f"Suggestions for {file.filename}: {suggestions}")
