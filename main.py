@@ -72,6 +72,7 @@ def main():
 
                     # Post inline comment
                     post_inline_comment(pr, file.filename, position, suggestion)
+                    
 
 if __name__ == "__main__":
     main()
