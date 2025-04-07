@@ -1,7 +1,20 @@
 import os
 from github import Github
-from github_utils import get_pr_details
+from github_utils import get_pr_details, post_inline_comment
 from ollama import analyze_code_with_codellama
+from unidiff import PatchSet
+
+def map_line_to_diff_position(patch, absolute_line):
+    """
+    Maps an absolute line number to a diff position.
+    """
+    patch_set = PatchSet(patch)
+    for patched_file in patch_set:
+        for hunk in patched_file:
+            for line in hunk:
+                if line.target_line_no == absolute_line:
+                    return line.diff_line_no
+    return None
 
 def main():
     token = os.getenv("GITHUB_TOKEN")
@@ -16,23 +29,20 @@ def main():
     files = pr.get_files()
     for file in files:
         if file.filename.endswith(".py"):
-            print(f"Analyzing file: {file.filename}")  # Debugging
+            print(f"Analyzing file: {file.filename}")
             suggestions = analyze_code_with_codellama(file.patch)
-            
+
             # Debugging: Log suggestions
             print(f"Suggestions for {file.filename}: {suggestions}")
-            
+
             for line, suggestion in suggestions.items():
-                try:
-                    print(f"Posting comment to {file.filename} at line {line}: {suggestion}")  # Debugging
-                    pr.create_review_comment(
-                        body=suggestion,
-                        commit_id=pr.head.sha,
-                        path=file.filename,
-                        position=line,  # Ensure this is the correct diff position
-                    )
-                except Exception as e:
-                    print(f"Failed to post comment: {e}")  # Debugging
+                position = map_line_to_diff_position(file.patch, line)
+                if position is None:
+                    print(f"Could not map line {line} to a diff position.")
+                    continue
+
+                # Post inline comment
+                post_inline_comment(pr, file.filename, position, suggestion)
 
 if __name__ == "__main__":
     main()
