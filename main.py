@@ -1,7 +1,6 @@
 import os
 from github import Github
 from github_utils import get_pr_details, post_inline_comment
-from ollama import analyze_code_with_codellama
 from unidiff import PatchSet
 
 def map_line_to_diff_position(patch, absolute_line):
@@ -35,14 +34,19 @@ def main():
             # Debugging: Log suggestions
             print(f"Suggestions for {file.filename}: {suggestions}")
 
+            # Handle line-specific and general suggestions
             for line, suggestion in suggestions.items():
-                position = map_line_to_diff_position(file.patch, line)
-                if position is None:
-                    print(f"Could not map line {line} to a diff position.")
-                    continue
+                if line == "general":
+                    # Post a general comment on the PR
+                    pr.create_issue_comment(f"General suggestions for {file.filename}:\n\n{suggestion}")
+                else:
+                    position = map_line_to_diff_position(file.patch, line)
+                    if position is None:
+                        print(f"Could not map line {line} to a diff position.")
+                        continue
 
-                # Post inline comment
-                post_inline_comment(pr, file.filename, position, suggestion)
+                    # Post inline comment
+                    post_inline_comment(pr, file.filename, position, suggestion)
 
 if __name__ == "__main__":
     main()
