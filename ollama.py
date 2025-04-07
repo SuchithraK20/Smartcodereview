@@ -92,7 +92,7 @@ Rules:
 
 If no issues found, return: []
 """
-    
+
     # Call Codellama to analyze the code
     codellama_response = call_codellama(prompt)
 
@@ -100,20 +100,21 @@ If no issues found, return: []
     print(f"Codellama Response: {codellama_response}")
 
     # Parse the response to extract line-specific suggestions
+    suggestions = []
     try:
-        # Find the JSON array in the response
+        # Extract the JSON portion of the response
         json_start = codellama_response.find("[")
         json_end = codellama_response.rfind("]") + 1
-        if json_start == -1 or json_end == -1:
-            raise ValueError("No JSON array found in the response.")
-
-        json_content = codellama_response[json_start:json_end]
-        suggestions = json.loads(json_content)
+        if json_start != -1 and json_end != -1:
+            json_content = codellama_response[json_start:json_end]
+            suggestions = json.loads(json_content)
+        else:
+            raise ValueError("No valid JSON array found in the response.")
     except (json.JSONDecodeError, ValueError) as e:
         print(f"Failed to parse Codellama response as JSON: {e}")
-        suggestions = []
+        print("Attempting to parse as plain text.")
 
-        # Fallback to plain text parsing
+        # Extract line-specific suggestions using regex for plain text fallback
         for match in re.finditer(r"\[CHANGED\] Line (\d+): (.+)", codellama_response):
             line_number = int(match.group(1))
             message = match.group(2).strip()
