@@ -17,13 +17,23 @@ def call_codellama(prompt: str) -> str:
     try:
         response = requests.post(url, headers=headers, json=payload)
         response.raise_for_status()  # Raise an error for HTTP status codes 4xx/5xx
-        return response.json().get("choices", [{}])[0].get("text", "").strip()
+
+        # Debugging: Log the raw response text
+        print(f"Raw response from Codellama: {response.text}")
+
+        # Attempt to parse the response as JSON
+        response_json = response.json()
+        return response_json.get("choices", [{}])[0].get("text", "").strip()
     except requests.exceptions.RequestException as e:
         print(f"Error calling Codellama: {e}")
         return "Error: Unable to process the request."
-    except (KeyError, IndexError) as e:
-        print(f"Unexpected response format: {e}")
+    except json.JSONDecodeError as e:
+        print(f"Failed to parse JSON response: {e}")
+        print(f"Raw response: {response.text}")
         return "Error: Unexpected response format."
+    except (KeyError, IndexError) as e:
+        print(f"Unexpected response structure: {e}")
+        return "Error: Unexpected response structure."
 
 def analyze_code_with_codellama(file_content: str) -> dict:
     """
