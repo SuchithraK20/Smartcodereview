@@ -43,17 +43,11 @@ def call_codellama(prompt: str) -> str:
         
 def analyze_code_with_codellama(file_patch: str, filename: str, changed_lines: list) -> dict:
     """
-    Sends the code content to Codellama for analysis and returns suggestions mapped to line numbers or general suggestions.
+    Sends the code content to Codellama for analysis and returns suggestions mapped to line numbers.
     """
     # Prepare the prompt for Codellama
     prompt = f"""
-You are an expert code reviewer. Review the following code changes and provide specific, actionable feedback. Focus on:
-1. Type safety and potential runtime issues
-2. Architecture and design patterns
-3. Code readability and maintainability
-4. Security vulnerabilities (IMPORTANT: for security issues like 'eval', use the EXACT line where the dangerous function is called)
-5. Performance implications
-
+Please review the following  code and provide feedback in a JSON format:
 The code below shows:
 - Each line starts with its EXACT line number followed by a colon
 - Changed lines are marked with [CHANGED]
@@ -102,24 +96,27 @@ If no issues found, return: []
     # Parse the response to extract line-specific suggestions
     suggestions = []
     try:
-        # Extract the JSON portion of the response
-        json_start = codellama_response.find("[")
-        json_end = codellama_response.rfind("]") + 1
-        if json_start != -1 and json_end != -1:
-            json_content = codellama_response[json_start:json_end]
-            suggestions = json.loads(json_content)
+        # Handle JSON response
+        if "general" in codellama_response:
+            json_start = codellama_response.find("[")
+            json_end = codellama_response.rfind("]") + 1
+            if json_start != -1 and json_end != -1:
+                json_content = codellama_response[json_start:json_end]
+                suggestions = json.loads(json_content)
+            else:
+                raise ValueError("No valid JSON array found in the response.")
         else:
-            raise ValueError("No valid JSON array found in the response.")
+            suggestions = json.loads(codellama_response)
     except (json.JSONDecodeError, ValueError) as e:
         print(f"Failed to parse Codellama response as JSON: {e}")
         print("Attempting to parse as plain text.")
 
-        # Extract line-specific suggestions using regex for plain text fallback
-        for match in re.finditer(r"\[CHANGED\] Line (\d+): (.+)", codellama_response):
-            line_number = int(match.group(1))
-            message = match.group(2).strip()
-            suggestions.append({"line": line_number, "message": message})
-     # Map suggestions to line numbers
+        # Handle streaming response fallback
+        if isinstance(codellama_response, str):
+            suggestions = _handle_plain_text_response(codellama_response)
+        else:
+            print("Codellama response is not a valid string.")
+    # Map suggestions to line numbers
     line_suggestions = {}
     for suggestion in suggestions:
         line = suggestion.get("line")
@@ -139,4 +136,17 @@ If no issues found, return: []
             line_suggestions["general"] = codellama_response.strip()
 
     return line_suggestions
-
+def _handle_plain_text_response(response: str) -> list:
+    """
+    Handles plain text responses from Codellama and extracts actionable feedback.
+    """
+    suggestions = []
+    try:
+        # Use regex to extract line-specific suggestions
+        matches = re.findall(r'"line":\s*(\d+),.*?"message":\s*"(.*?)"', response, re.DOTALL)
+        for match in matches:
+            line, message = match
+            suggestions.append({"line": int(line), "message": message.strip()})
+    except Exception as e:
+        print(f"Failed to parse plain text response: {e}")
+    return suggestions
