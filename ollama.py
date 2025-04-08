@@ -115,11 +115,12 @@ If no issues found, return: []
         print("Attempting to parse as plain text.")
 
         # Extract line-specific suggestions using regex for plain text fallback
-        for match in re.finditer(r"\[CHANGED\] Line (\d+): (.+)", codellama_response):
+        for match in re.finditer(r'"line":\s*(\d+),\s*"message":\s*"([^"]+)"', codellama_response):
             line_number = int(match.group(1))
             message = match.group(2).strip()
             suggestions.append({"line": line_number, "message": message})
-     # Map suggestions to line numbers
+
+    # Map suggestions to line numbers
     line_suggestions = {}
     for suggestion in suggestions:
         line = suggestion.get("line")
@@ -132,11 +133,10 @@ If no issues found, return: []
     # If no line-specific suggestions, add general suggestions
     if not line_suggestions and isinstance(codellama_response, str):
         # Extract general suggestions if present
-        general_start = codellama_response.find("General suggestions")
+        general_start = codellama_response.find("The code changes introduce several potential issues:")
         if general_start != -1:
             line_suggestions["general"] = codellama_response[general_start:].strip()
         else:
             line_suggestions["general"] = codellama_response.strip()
 
     return line_suggestions
-
