@@ -102,7 +102,7 @@ If no issues found, return: []
     # Parse the response to extract line-specific suggestions
     suggestions = []
     try:
-        # Extract the JSON portion of the response
+        # Handle JSON response
         json_start = codellama_response.find("[")
         json_end = codellama_response.rfind("]") + 1
         if json_start != -1 and json_end != -1:
@@ -114,12 +114,10 @@ If no issues found, return: []
         print(f"Failed to parse Codellama response as JSON: {e}")
         print("Attempting to parse as plain text.")
 
-        # Extract line-specific suggestions using regex for plain text fallback
-        for match in re.finditer(r"\[CHANGED\] Line (\d+): (.+)", codellama_response):
-            line_number = int(match.group(1))
-            message = match.group(2).strip()
-            suggestions.append({"line": line_number, "message": message})
-     # Map suggestions to line numbers
+        # Handle streaming response fallback
+        suggestions = _handle_streaming_response(codellama_response)
+
+    # Map suggestions to line numbers
     line_suggestions = {}
     for suggestion in suggestions:
         line = suggestion.get("line")
@@ -139,4 +137,22 @@ If no issues found, return: []
             line_suggestions["general"] = codellama_response.strip()
 
     return line_suggestions
+def _handle_streaming_response(response):
+    """
+    Handles streaming responses from Codellama and extracts actionable feedback.
+    """
+    code_response = ""
+    for line in response.iter_lines():
+        if line:
+            try:
+                json_object = json.loads(line.decode("utf-8"))
+                code_response += json_object.get("response", "")
+            except json.JSONDecodeError:
+                print(f"Skipping invalid JSON fragment: {line.decode('utf-8')}")
+                continue
 
+    try:
+        return json.loads(code_response)
+    except json.JSONDecodeError as e:
+        print(f"Failed to parse streaming response as JSON: {e}")
+        return []
