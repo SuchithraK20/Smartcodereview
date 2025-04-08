@@ -8,12 +8,17 @@ def map_line_to_diff_position(patch, absolute_line):
     """
     Maps an absolute line number to a diff position.
     """
-    patch_set = PatchSet(patch)
-    for patched_file in patch_set:
-        for hunk in patched_file:
-            for line in hunk:
-                if line.target_line_no == absolute_line:
-                    return line.diff_line_no
+    try:
+        patch_set = PatchSet(patch)
+        for patched_file in patch_set:
+            for hunk in patched_file:
+                for line in hunk:
+                    if line.target_line_no == absolute_line:
+                        print(f"Mapping absolute line {absolute_line} to diff position {line.diff_line_no}")
+                        return line.diff_line_no
+    except Exception as e:
+        print(f"Error parsing patch or mapping line {absolute_line}: {e}")
+    print(f"Could not map absolute line {absolute_line} to a diff position.")
     return None
 
 
@@ -49,7 +54,7 @@ def main():
     for file in files:
         if file.filename.endswith(".py"):
             print(f"Analyzing file: {file.filename}")
-
+            print(f"Patch content for {file.filename}:\n{file.patch}")  # Log the raw patch content
             # Extract changed lines
             changed_lines = extract_changed_lines(file.patch)
 
