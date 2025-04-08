@@ -43,55 +43,47 @@ def call_codellama(prompt: str) -> str:
         
 def analyze_code_with_codellama(file_patch: str, filename: str, changed_lines: list) -> dict:
     """
-    Sends the code content to Codellama for analysis and returns suggestions mapped to line numbers or general suggestions.
+    Sends the code content to Codellama for analysis and returns suggestions mapped to line numbers.
+    Only considers suggestions for changed lines.
     """
     # Prepare the prompt for Codellama
     prompt = f"""
-You are an expert code reviewer. Review the following code changes and provide specific, actionable feedback. Focus on:
-1. Type safety and potential runtime issues
-2. Architecture and design patterns
-3. Code readability and maintainability
-4. Security vulnerabilities (IMPORTANT: for security issues like 'eval', use the EXACT line where the dangerous function is called)
-5. Performance implications
-
-The code below shows:
+Please review the following code changes and provide suggestions for improvements in a JSON format:
+The code below includes:
 - Each line starts with its EXACT line number followed by a colon
 - Changed lines are marked with [CHANGED]
 - You MUST use the EXACT line number shown at the start of the line in your response
 - DO NOT use a line number unless you see it explicitly at the start of a line
-- For security issues, use the line number where the actual dangerous code appears
-- For other multi-line issues, use the first line number where the issue appears
-- Context lines are shown without markers
+- Focus only on lines marked as [CHANGED]
+- Provide suggestions for improving the code, such as readability, security, performance, etc.
+- Be specific and actionable in your recommendations.
 
 IMPORTANT NOTES:
-- For security issues (like eval, Function constructor, etc.), always use the line number where the dangerous function is actually called
-- For performance issues (like nested loops), use the line number of the outer function or loop
-- Double-check that your line numbers match exactly with where the issue occurs
+- If there are security issues (like eval, Function constructor, etc.), always use the line number where the dangerous code is found.
+- For performance issues (like nested loops), use the line number of the outer function or loop.
+- Double-check that your line numbers match exactly where the issue occurs.
+
 Code to review from {filename}:
 
 {file_patch}
 
 Response format (use EXACT line numbers from the start of lines):
 [
-  {{
-    "line": <number_from_start_of_line>,
-    "type": "type-safety" | "architecture" | "readability" | "security" | "performance" | "suggestion" | "good-practice",
-    "severity": "high" | "medium" | "low",
-    "message": "<specific_issue_and_recommendation>"
-  }}
+    {{
+        "line": <number_from_start_of_line>,
+        "type": "readability" | "security" | "performance" | "suggestion" | "good-practice",
+        "severity": "high" | "medium" | "low",
+        "message": "<specific_issue_and_recommendation>"
+    }}
 ]
 
 Rules:
-1. Only comment on [CHANGED] lines
-2. Use EXACT line numbers shown at start of lines
-3. Each line number must match one of: {changed_lines}
-4. Consider context when making suggestions
-5. Be specific and actionable in recommendations
-6. For security issues, use the exact line where dangerous code appears
-7. For other multi-line issues, use the first line number where the issue appears
-
-If no issues found, return: []
+1. Focus ONLY on the [CHANGED] lines.
+2. Use EXACT line numbers shown at the start of the line.
+3. For each suggestion, explain the issue and provide actionable recommendations.
+4. If no issues are found, return an empty array: []
 """
+
 
     # Call Codellama to analyze the code
     codellama_response = call_codellama(prompt)
@@ -102,24 +94,28 @@ If no issues found, return: []
     # Parse the response to extract line-specific suggestions
     suggestions = []
     try:
-        # Extract the JSON portion of the response
-        json_start = codellama_response.find("[")
-        json_end = codellama_response.rfind("]") + 1
-        if json_start != -1 and json_end != -1:
-            json_content = codellama_response[json_start:json_end]
-            suggestions = json.loads(json_content)
+        # Handle JSON response
+        if "general" in codellama_response:
+            json_start = codellama_response.find("[")
+            json_end = codellama_response.rfind("]") + 1
+            if json_start != -1 and json_end != -1:
+                json_content = codellama_response[json_start:json_end]
+                suggestions = json.loads(json_content)
+            else:
+                raise ValueError("No valid JSON array found in the response.")
         else:
-            raise ValueError("No valid JSON array found in the response.")
+            suggestions = json.loads(codellama_response)
     except (json.JSONDecodeError, ValueError) as e:
         print(f"Failed to parse Codellama response as JSON: {e}")
         print("Attempting to parse as plain text.")
 
-        # Extract line-specific suggestions using regex for plain text fallback
-        for match in re.finditer(r"\[CHANGED\] Line (\d+): (.+)", codellama_response):
-            line_number = int(match.group(1))
-            message = match.group(2).strip()
-            suggestions.append({"line": line_number, "message": message})
-     # Map suggestions to line numbers
+        # Handle streaming response fallback
+        if isinstance(codellama_response, str):
+            suggestions = _handle_plain_text_response(codellama_response)
+        else:
+            print("Codellama response is not a valid string.")
+
+    # Map suggestions to line numbers
     line_suggestions = {}
     for suggestion in suggestions:
         line = suggestion.get("line")
@@ -139,4 +135,17 @@ If no issues found, return: []
             line_suggestions["general"] = codellama_response.strip()
 
     return line_suggestions
-
+def _handle_plain_text_response(response: str) -> list:
+    """
+    Handles plain text responses from Codellama and extracts actionable feedback.
+    """
+    suggestions = []
+    try:
+        # Use regex to extract line-specific suggestions
+        matches = re.findall(r'"line":\s*(\d+),.*?"message":\s*"(.*?)"', response, re.DOTALL)
+        for match in matches:
+            line, message = match
+            suggestions.append({"line": int(line), "message": message.strip()})
+    except Exception as e:
+        print(f"Failed to parse plain text response: {e}")
+    return suggestions
