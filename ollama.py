@@ -119,8 +119,7 @@ If no issues found, return: []
             line_number = int(match.group(1))
             message = match.group(2).strip()
             suggestions.append({"line": line_number, "message": message})
-
-    # Map suggestions to line numbers
+     # Map suggestions to line numbers
     line_suggestions = {}
     for suggestion in suggestions:
         line = suggestion.get("line")
@@ -132,6 +131,12 @@ If no issues found, return: []
 
     # If no line-specific suggestions, add general suggestions
     if not line_suggestions and isinstance(codellama_response, str):
-        line_suggestions["general"] = codellama_response.strip()
+        # Extract general suggestions if present
+        general_start = codellama_response.find("General suggestions")
+        if general_start != -1:
+            line_suggestions["general"] = codellama_response[general_start:].strip()
+        else:
+            line_suggestions["general"] = codellama_response.strip()
 
     return line_suggestions
+
