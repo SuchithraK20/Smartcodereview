@@ -100,13 +100,13 @@ If no issues found, return: []
     print(f"Codellama Response: {codellama_response}")
 
     # Parse the response to extract line-specific suggestions
-    suggestions = []
+      suggestions = []
     try:
-        # Extract the JSON portion of the response
-        json_start = codellama_response.find("[")
-        json_end = codellama_response.rfind("]") + 1
+        # Handle JSON response
+        json_start = response.find("[")
+        json_end = response.rfind("]") + 1
         if json_start != -1 and json_end != -1:
-            json_content = codellama_response[json_start:json_end]
+            json_content = response[json_start:json_end]
             suggestions = json.loads(json_content)
         else:
             raise ValueError("No valid JSON array found in the response.")
@@ -114,12 +114,10 @@ If no issues found, return: []
         print(f"Failed to parse Codellama response as JSON: {e}")
         print("Attempting to parse as plain text.")
 
-        # Extract line-specific suggestions using regex for plain text fallback
-        for match in re.finditer(r"\[CHANGED\] Line (\d+): (.+)", codellama_response):
-            line_number = int(match.group(1))
-            message = match.group(2).strip()
-            suggestions.append({"line": line_number, "message": message})
-     # Map suggestions to line numbers
+        # Handle streaming response fallback
+        suggestions = _handle_streaming_response(response)
+
+    # Map suggestions to line numbers
     line_suggestions = {}
     for suggestion in suggestions:
         line = suggestion.get("line")
@@ -130,13 +128,31 @@ If no issues found, return: []
                 line_suggestions[int(line)] = message
 
     # If no line-specific suggestions, add general suggestions
-    if not line_suggestions and isinstance(codellama_response, str):
+    if not line_suggestions and isinstance(response, str):
         # Extract general suggestions if present
-        general_start = codellama_response.find("General suggestions")
+        general_start = response.find("General suggestions")
         if general_start != -1:
-            line_suggestions["general"] = codellama_response[general_start:].strip()
+            line_suggestions["general"] = response[general_start:].strip()
         else:
-            line_suggestions["general"] = codellama_response.strip()
+            line_suggestions["general"] = response.strip()
 
     return line_suggestions
+def _handle_streaming_response(response):
+    """
+    Handles streaming responses from Codellama and extracts actionable feedback.
+    """
+    code_response = ""
+    for line in response.iter_lines():
+        if line:
+            try:
+                json_object = json.loads(line.decode("utf-8"))
+                code_response += json_object.get("response", "")
+            except json.JSONDecodeError:
+                print(f"Skipping invalid JSON fragment: {line.decode('utf-8')}")
+                continue
 
+    try:
+        return json.loads(code_response)
+    except json.JSONDecodeError as e:
+        print(f"Failed to parse streaming response as JSON: {e}")
+        return []
