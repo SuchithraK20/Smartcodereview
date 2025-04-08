@@ -8,15 +8,18 @@ def map_line_to_diff_position(patch, absolute_line):
     """
     Maps an absolute line number to a diff position.
     """
-    patch_set = PatchSet(patch)
-    for patched_file in patch_set:
-        for hunk in patched_file:
-            for line in hunk:
-                if line.target_line_no == absolute_line:
-                    return line.diff_line_no
+    try:
+        patch_set = PatchSet(patch)
+        for patched_file in patch_set:
+            for hunk in patched_file:
+                for line in hunk:
+                    if line.target_line_no == absolute_line:
+                        print(f"Mapping absolute line {absolute_line} to diff position {line.diff_line_no}")
+                        return line.diff_line_no
+    except Exception as e:
+        print(f"Error parsing patch or mapping line {absolute_line}: {e}")
+    print(f"Could not map absolute line {absolute_line} to a diff position.")
     return None
-
-
 
 def extract_changed_lines(patch):
     """
@@ -35,6 +38,37 @@ def extract_changed_lines(patch):
         print(f"Failed to parse patch: {e}")
         return []
 
+def sanitize_patch_content(patch_content):
+    """
+    Sanitizes the patch content to avoid any special character issues.
+    """
+    return patch_content.replace("@@", "@@@").replace("-", "_").replace("+", "~")
+
+def validate_patch_format(patch_content):
+    """
+    Validates the format of the patch content to ensure it is correctly structured.
+    """
+    if not patch_content.startswith("@@"):
+        raise ValueError("Invalid patch format: missing hunk header.")
+    return True
+
+def handle_codellama_suggestions(suggestions, file, pr):
+    """
+    Handles suggestions by posting inline comments or general comments to the PR.
+    """
+    for line, suggestion in suggestions.items():
+        if line == "general":
+            # Post a general comment on the PR
+            pr.create_issue_comment(f"General suggestions for {file.filename}:\n\n{suggestion}")
+        else:
+            position = map_line_to_diff_position(file.patch, int(line))
+            if position is None:
+                print(f"Could not map line {line} to a diff position.")
+                continue
+
+            # Post inline comment
+            post_inline_comment(pr, file.filename, position, suggestion)
+
 def main():
     token = os.getenv("GITHUB_TOKEN")
     repo_name = os.getenv("GITHUB_REPOSITORY")
@@ -49,30 +83,35 @@ def main():
     for file in files:
         if file.filename.endswith(".py"):
             print(f"Analyzing file: {file.filename}")
+            print(f"Patch content for {file.filename}:\n{file.patch}")  # Log the raw patch content
 
-            # Extract changed lines
-            changed_lines = extract_changed_lines(file.patch)
+            # Ensure that the patch is in the correct format
+            try:
+                patch_content = file.patch
+                # Validate the patch format before proceeding
+                if validate_patch_format(patch_content):
+                    print("Patch content loaded correctly.")
+                else:
+                    print("Patch format is invalid.")
+                    continue
+            except Exception as e:
+                print(f"Error loading patch content: {e}")
+                continue
 
-            # Call the updated analyze_code_with_codellama function
-            suggestions = analyze_code_with_codellama(file.patch, file.filename, changed_lines)
+            # Sanitize patch content to avoid special character issues
+            sanitized_patch_content = sanitize_patch_content(patch_content)
 
-            # Debugging: Log suggestions
+            # Extract changed lines from the patch
+            changed_lines = extract_changed_lines(sanitized_patch_content)
+
+            # Call the analyze_code_with_codellama function for code review
+            suggestions = analyze_code_with_codellama(sanitized_patch_content, file.filename, changed_lines)
+
+            # Debugging: Log suggestions for each file
             print(f"Suggestions for {file.filename}: {suggestions}")
 
             # Handle line-specific and general suggestions
-            for line, suggestion in suggestions.items():
-                if line == "general":
-                    # Post a general comment on the PR
-                    pr.create_issue_comment(f"General suggestions for {file.filename}:\n\n{suggestion}")
-                else:
-                    position = map_line_to_diff_position(file.patch, int(line))
-                    if position is None:
-                        print(f"Could not map line {line} to a diff position.")
-                        continue
-
-                    # Post inline comment
-                    post_inline_comment(pr, file.filename, position, suggestion)
-                    
+            handle_codellama_suggestions(suggestions, file, pr)
 
 if __name__ == "__main__":
     main()
